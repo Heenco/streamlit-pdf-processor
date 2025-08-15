@@ -1,0 +1,6 @@
+streamlit
+streamlit-lottie
+PyMuPDF
+Pillow
+requests
+jsonschema

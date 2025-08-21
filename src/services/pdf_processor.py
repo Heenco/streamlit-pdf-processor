@@ -2,6 +2,7 @@ def process_pdf(pdf_file):
     import fitz  # PyMuPDF
     import json
     import base64
+    import hashlib
     from io import BytesIO
     from PIL import Image
 
@@ -43,17 +44,31 @@ def process_pdf(pdf_file):
         result["text"] = "\n".join(text_content)
 
         # Extract images
+        # Use a set to track duplicate images
+        seen_hashes = set()
+        
         for page in doc:
             image_list = page.get_images(full=True)
             for img in image_list:
-                xref = img[0]
-                base_image = doc.extract_image(xref)
-                image_bytes = base_image["image"]
-                image = Image.open(BytesIO(image_bytes))
-                buffered = BytesIO()
-                image.convert("RGB").save(buffered, format="JPEG", quality=70)
-                img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
-                result["images"].append(f"data:image/jpeg;base64,{img_base64}")
+                try:
+                    xref = img[0]
+                    base_image = doc.extract_image(xref)
+                    image_bytes = base_image["image"]
+                    
+                    # Hash the image bytes to detect duplicates
+                    img_hash = hashlib.sha256(image_bytes).hexdigest()
+                    if img_hash in seen_hashes:
+                        continue  # skip duplicate
+                    seen_hashes.add(img_hash)
+                    
+                    image = Image.open(BytesIO(image_bytes))
+                    buffered = BytesIO()
+                    image.convert("RGB").save(buffered, format="JPEG", quality=70)
+                    img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+                    result["images"].append(f"data:image/jpeg;base64,{img_base64}")
+                except Exception as e:
+                    # Skip problematic images
+                    continue
 
         return json.dumps(result)
 
